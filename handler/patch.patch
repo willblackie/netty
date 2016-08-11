@@ -1,0 +1,44 @@
+From 13987d6399a01fc3d8c0ac7e355a566d9253b8b2 Mon Sep 17 00:00:00 2001
+From: Tomer Cohen <tomer+github.com@tomercohen.com>
+Date: Mon, 15 Aug 2016 19:57:05 +0300
+Subject: [PATCH]  Support Unicode filenames and spaces in directory listing
+
+Motivation:
+
+The HTTP Static File Server seems to ignore filenames that doesn't contains only latin characters, but these days people wish to serve files in other languages, or even include some emojis in the filename. Although these files are not displayed on the directory listing, they are accessible by HTTP requests. This fix will make such files more visible.
+
+Modifications:
+
+I've changed the ALLOWED_FILE_NAME pattern to disallow only files that starts with underline, minus or a dot (such as .htaccess), and hide other "unsafe" filenames that may be used to trigger some security issues. Other filenames, including the space character are allowed.
+
+I've also added charset encoding to the directory listing, because the browser default MAY be configured for ISO-8859-1 instead of UTF-8.
+
+Result:
+
+Directory listing will work for files that contains the space character, as well as other Unicode characters.
+---
+ .../java/io/netty/example/http/file/HttpStaticFileServerHandler.java  | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/example/src/main/java/io/netty/example/http/file/HttpStaticFileServerHandler.java b/example/src/main/java/io/netty/example/http/file/HttpStaticFileServerHandler.java
+index b2a4f33..6cc0287 100644
+--- a/example/src/main/java/io/netty/example/http/file/HttpStaticFileServerHandler.java
++++ b/example/src/main/java/io/netty/example/http/file/HttpStaticFileServerHandler.java
+@@ -262,7 +262,7 @@ private static String sanitizeUri(String uri) {
+         return SystemPropertyUtil.get("user.dir") + File.separator + uri;
+     }
+ 
+-    private static final Pattern ALLOWED_FILE_NAME = Pattern.compile("[A-Za-z0-9][-_A-Za-z0-9\\.]*");
++    private static final Pattern ALLOWED_FILE_NAME = Pattern.compile("[^-\\._]?[^<>&\\\"]*");
+ 
+     private static void sendListing(ChannelHandlerContext ctx, File dir) {
+         FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, OK);
+@@ -271,7 +271,7 @@ private static void sendListing(ChannelHandlerContext ctx, File dir) {
+         String dirPath = dir.getPath();
+         StringBuilder buf = new StringBuilder()
+             .append("<!DOCTYPE html>\r\n")
+-            .append("<html><head><title>")
++            .append("<html><head><meta charset='utf-8' /><title>")
+             .append("Listing of: ")
+             .append(dirPath)
+             .append("</title></head><body>\r\n")
