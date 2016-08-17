@@ -46,26 +46,27 @@ public interface DnsCache {
     /**
      * Return the cached entries for the given hostname.
      * @param hostname the hostname
-     * @param additional the additional records
+     * @param additionals the additional records
      * @return the cached entries
      */
-    List<DnsCacheEntry> get(String hostname, Iterable<DnsRecord> additional);
+    List<DnsCacheEntry> get(String hostname, DnsRecord[] additionals);
 
     /**
      * Cache a resolved address for a given hostname.
      * @param hostname the hostname
+     * @param additionals the additional records
      * @param address the resolved adresse
-     * @param additional the additional records
      * @param originalTtl the TLL as returned by the DNS server
      * @param loop the {@link EventLoop} used to register the TTL timeout
      */
-    void cache(String hostname, Iterable<DnsRecord> additional, InetAddress address, long originalTtl, EventLoop loop);
+    void cache(String hostname, DnsRecord[] additionals, InetAddress address, long originalTtl, EventLoop loop);
 
     /**
      * Cache the resolution failure for a given hostname.
      * @param hostname the hostname
+     * @param additionals the additional records
      * @param cause the resolution failure
      * @param loop the {@link EventLoop} used to register the TTL timeout
      */
-    void cache(String hostname, Iterable<DnsRecord> additional, Throwable cause, EventLoop loop);
+    void cache(String hostname, DnsRecord[] additionals, Throwable cause, EventLoop loop);
 }

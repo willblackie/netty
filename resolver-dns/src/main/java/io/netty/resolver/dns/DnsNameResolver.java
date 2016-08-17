@@ -56,7 +56,9 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import static io.netty.util.internal.ObjectUtil.*;
@@ -408,11 +410,32 @@ public class DnsNameResolver extends InetNameResolver {
         doResolve(inetHost, Collections.<DnsRecord>emptySet(), promise, resolveCache);
     }
 
-    private static void validateAdditional(Iterable<DnsRecord> additional) {
-        for (DnsRecord r: additional) {
-            if (r instanceof DnsRawRecord) {
-                throw new IllegalArgumentException("DnsRawRecord implementations not allowed: " + r);
+    private static DnsRecord[] validateAdditionals(Iterable<DnsRecord> additionals) {
+        if (additionals instanceof Collection) {
+            Collection<DnsRecord> records = (Collection<DnsRecord>) additionals;
+            for (DnsRecord r: additionals) {
+                validateAdditional(r);
             }
+            return records.toArray(new DnsRecord[records.size()]);
+        }
+
+        Iterator<DnsRecord> additionalsIt = additionals.iterator();
+        if (!additionalsIt.hasNext()) {
+            return null;
+        }
+        List<DnsRecord> records = new ArrayList<DnsRecord>();
+        do {
+            DnsRecord r = additionalsIt.next();
+            validateAdditional(r);
+            records.add(r);
+        } while (additionalsIt.hasNext());
+
+        return records.toArray(new DnsRecord[records.size()]);
+    }
+
+    private static void validateAdditional(DnsRecord record) {
+        if (record instanceof DnsRawRecord) {
+            throw new IllegalArgumentException("DnsRawRecord implementations not allowed: " + record);
         }
     }
 
@@ -421,10 +444,10 @@ public class DnsNameResolver extends InetNameResolver {
      * instead of using the global one.
      */
     protected void doResolve(String inetHost,
-                             Iterable<DnsRecord> additional,
+                             Iterable<DnsRecord> additionals,
                              Promise<InetAddress> promise,
                              DnsCache resolveCache) throws Exception {
-        validateAdditional(additional);
+        DnsRecord[] additionalsArray = validateAdditionals(additionals);
         final byte[] bytes = NetUtil.createByteArrayFromIpAddressString(inetHost);
         if (bytes != null) {
             // The inetHost is actually an ipaddress.
@@ -440,16 +463,16 @@ public class DnsNameResolver extends InetNameResolver {
             return;
         }
 
-        if (!doResolveCached(hostname, additional, promise, resolveCache)) {
-            doResolveUncached(hostname, additional, promise, resolveCache);
+        if (!doResolveCached(hostname, additionalsArray, promise, resolveCache)) {
+            doResolveUncached(hostname, additionalsArray, promise, resolveCache);
         }
     }
 
     private boolean doResolveCached(String hostname,
-                                    Iterable<DnsRecord> additional,
+                                    DnsRecord[] additionals,
                                     Promise<InetAddress> promise,
                                     DnsCache resolveCache) {
-        final List<DnsCacheEntry> cachedEntries = resolveCache.get(hostname, additional);
+        final List<DnsCacheEntry> cachedEntries = resolveCache.get(hostname, additionals);
         if (cachedEntries == null || cachedEntries.isEmpty()) {
             return false;
         }
@@ -500,24 +523,24 @@ public class DnsNameResolver extends InetNameResolver {
     }
 
     private void doResolveUncached(String hostname,
-                                   final Iterable<DnsRecord> additional,
+                                   DnsRecord[] additionals,
                                    Promise<InetAddress> promise,
                                    DnsCache resolveCache) {
-        SingleResolverContext ctx = new SingleResolverContext(this, hostname, additional, resolveCache);
+        SingleResolverContext ctx = new SingleResolverContext(this, hostname, additionals, resolveCache);
         ctx.resolve(promise);
     }
 
     static final class SingleResolverContext extends DnsNameResolverContext<InetAddress> {
 
         SingleResolverContext(DnsNameResolver parent, String hostname,
-                              Iterable<DnsRecord> additional, DnsCache resolveCache) {
-            super(parent, hostname, additional, resolveCache);
+                             DnsRecord[] additionals, DnsCache resolveCache) {
+            super(parent, hostname, additionals, resolveCache);
         }
 
         @Override
         DnsNameResolverContext<InetAddress> newResolverContext(DnsNameResolver parent, String hostname,
-                                                               Iterable<DnsRecord> additional, DnsCache resolveCache) {
-            return new SingleResolverContext(parent, hostname, additional, resolveCache);
+                                                               DnsRecord[] additionals, DnsCache resolveCache) {
+            return new SingleResolverContext(parent, hostname, additionals, resolveCache);
         }
 
         @Override
@@ -547,10 +570,10 @@ public class DnsNameResolver extends InetNameResolver {
      * instead of using the global one.
      */
     protected void doResolveAll(String inetHost,
-                                Iterable<DnsRecord> additional,
+                                Iterable<DnsRecord> additionals,
                                 Promise<List<InetAddress>> promise,
                                 DnsCache resolveCache) throws Exception {
-        validateAdditional(additional);
+        DnsRecord[] additionalsArray = validateAdditionals(additionals);
         final byte[] bytes = NetUtil.createByteArrayFromIpAddressString(inetHost);
         if (bytes != null) {
             // The unresolvedAddress was created via a String that contains an ipaddress.
@@ -566,16 +589,16 @@ public class DnsNameResolver extends InetNameResolver {
             return;
         }
 
-        if (!doResolveAllCached(hostname, additional, promise, resolveCache)) {
-            doResolveAllUncached(hostname, additional, promise, resolveCache);
+        if (!doResolveAllCached(hostname, additionalsArray, promise, resolveCache)) {
+            doResolveAllUncached(hostname, additionalsArray, promise, resolveCache);
         }
     }
 
     private boolean doResolveAllCached(String hostname,
-                                       Iterable<DnsRecord> additional,
+                                       DnsRecord[] additionals,
                                        Promise<List<InetAddress>> promise,
                                        DnsCache resolveCache) {
-        final List<DnsCacheEntry> cachedEntries = resolveCache.get(hostname, additional);
+        final List<DnsCacheEntry> cachedEntries = resolveCache.get(hostname, additionals);
         if (cachedEntries == null || cachedEntries.isEmpty()) {
             return false;
         }
@@ -616,14 +639,14 @@ public class DnsNameResolver extends InetNameResolver {
 
     static final class ListResolverContext extends DnsNameResolverContext<List<InetAddress>> {
         ListResolverContext(DnsNameResolver parent, String hostname,
-                            Iterable<DnsRecord> additional, DnsCache resolveCache) {
-            super(parent, hostname, additional, resolveCache);
+                            DnsRecord[] additionals, DnsCache resolveCache) {
+            super(parent, hostname, additionals, resolveCache);
         }
 
         @Override
         DnsNameResolverContext<List<InetAddress>> newResolverContext(
-                DnsNameResolver parent, String hostname, Iterable<DnsRecord> additional, DnsCache resolveCache) {
-            return new ListResolverContext(parent, hostname, additional, resolveCache);
+                DnsNameResolver parent, String hostname,  DnsRecord[] additionals, DnsCache resolveCache) {
+            return new ListResolverContext(parent, hostname, additionals, resolveCache);
         }
 
         @Override
@@ -652,11 +675,11 @@ public class DnsNameResolver extends InetNameResolver {
     }
 
     private void doResolveAllUncached(String hostname,
-                                      final Iterable<DnsRecord> additional,
+                                      DnsRecord[] additionals,
                                       Promise<List<InetAddress>> promise,
                                       DnsCache resolveCache) {
         DnsNameResolverContext<List<InetAddress>> ctx = new ListResolverContext(
-                this, hostname, additional, resolveCache);
+                this, hostname, additionals, resolveCache);
         ctx.resolve(promise);
     }
 
@@ -702,7 +725,7 @@ public class DnsNameResolver extends InetNameResolver {
     public Future<AddressedEnvelope<DnsResponse, InetSocketAddress>> query(
             InetSocketAddress nameServerAddr, DnsQuestion question) {
 
-        return query0(nameServerAddr, question, Collections.<DnsRecord>emptyList(),
+        return query0(nameServerAddr, question, null,
                 ch.eventLoop().<AddressedEnvelope<? extends DnsResponse, InetSocketAddress>>newPromise());
     }
 
@@ -710,9 +733,9 @@ public class DnsNameResolver extends InetNameResolver {
      * Sends a DNS query with the specified question with additional records using the specified name server list.
      */
     public Future<AddressedEnvelope<DnsResponse, InetSocketAddress>> query(
-            InetSocketAddress nameServerAddr, DnsQuestion question, Iterable<DnsRecord> additional) {
+            InetSocketAddress nameServerAddr, DnsQuestion question, Iterable<DnsRecord> additionals) {
 
-        return query0(nameServerAddr, question, additional,
+        return query0(nameServerAddr, question, toArray(additionals),
                 ch.eventLoop().<AddressedEnvelope<? extends DnsResponse, InetSocketAddress>>newPromise());
     }
 
@@ -723,7 +746,7 @@ public class DnsNameResolver extends InetNameResolver {
             InetSocketAddress nameServerAddr, DnsQuestion question,
             Promise<AddressedEnvelope<? extends DnsResponse, InetSocketAddress>> promise) {
 
-        return query0(nameServerAddr, question, Collections.<DnsRecord>emptyList(), promise);
+        return query0(nameServerAddr, question, null, promise);
     }
 
     /**
@@ -731,21 +754,41 @@ public class DnsNameResolver extends InetNameResolver {
      */
     public Future<AddressedEnvelope<DnsResponse, InetSocketAddress>> query(
             InetSocketAddress nameServerAddr, DnsQuestion question,
-            Iterable<DnsRecord> additional,
+            Iterable<DnsRecord> additionals,
             Promise<AddressedEnvelope<? extends DnsResponse, InetSocketAddress>> promise) {
 
-        return query0(nameServerAddr, question, additional, promise);
+        return query0(nameServerAddr, question, toArray(additionals), promise);
     }
 
-    private Future<AddressedEnvelope<DnsResponse, InetSocketAddress>> query0(
+    private static DnsRecord[] toArray(Iterable<DnsRecord> additionals) {
+        if (additionals instanceof Collection) {
+            Collection<DnsRecord> recordCollection = (Collection<DnsRecord>) additionals;
+            if (recordCollection.isEmpty()) {
+                return null;
+            }
+            return recordCollection.toArray(new DnsRecord[recordCollection.size()]);
+        }
+        Iterator<DnsRecord> recordIterator = additionals.iterator();
+        if (!recordIterator.hasNext()) {
+            return null;
+        }
+        List<DnsRecord> records = new ArrayList<DnsRecord>(4);
+        do {
+            records.add(recordIterator.next());
+        } while (recordIterator.hasNext());
+
+        return records.toArray(new DnsRecord[records.size()]);
+    }
+
+    Future<AddressedEnvelope<DnsResponse, InetSocketAddress>> query0(
             InetSocketAddress nameServerAddr, DnsQuestion question,
-            Iterable<DnsRecord> additional,
+            DnsRecord[] additionals,
             Promise<AddressedEnvelope<? extends DnsResponse, InetSocketAddress>> promise) {
 
         final Promise<AddressedEnvelope<DnsResponse, InetSocketAddress>> castPromise = cast(
                 checkNotNull(promise, "promise"));
         try {
-            new DnsQueryContext(this, nameServerAddr, question, additional, castPromise).query();
+            new DnsQueryContext(this, nameServerAddr, question, additionals, castPromise).query();
             return castPromise;
         } catch (Exception e) {
             return castPromise.setFailure(e);

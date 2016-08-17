@@ -46,7 +46,7 @@ final class DnsQueryContext {
     private final Promise<AddressedEnvelope<DnsResponse, InetSocketAddress>> promise;
     private final int id;
     private final DnsQuestion question;
-    private final Iterable<DnsRecord> additional;
+    private final DnsRecord[] additionals;
     private final DnsRecord optResource;
     private final InetSocketAddress nameServerAddr;
 
@@ -56,20 +56,20 @@ final class DnsQueryContext {
     DnsQueryContext(DnsNameResolver parent,
                     InetSocketAddress nameServerAddr,
                     DnsQuestion question,
-                    Iterable<DnsRecord> additional,
+                    DnsRecord[] additionals,
                     Promise<AddressedEnvelope<DnsResponse, InetSocketAddress>> promise) {
 
         this.parent = checkNotNull(parent, "parent");
         this.nameServerAddr = checkNotNull(nameServerAddr, "nameServerAddr");
         this.question = checkNotNull(question, "question");
-        this.additional = checkNotNull(additional, "additional");
+        this.additionals = additionals;
         this.promise = checkNotNull(promise, "promise");
         recursionDesired = parent.isRecursionDesired();
         id = parent.queryContextManager.add(this);
 
         if (parent.isOptResourceEnabled()) {
             optResource = new AbstractDnsOptPseudoRrRecord(parent.maxPayloadSize(), 0, 0) {
-                // We way want to remove this in the future and let the user just specify the opt record in the query.
+                // We may want to remove this in the future and let the user just specify the opt record in the query.
             };
         } else {
             optResource = null;
@@ -93,9 +93,12 @@ final class DnsQueryContext {
 
         query.addRecord(DnsSection.QUESTION, question);
 
-        for (DnsRecord record:additional) {
-            query.addRecord(DnsSection.ADDITIONAL, record);
+        if (additionals != null) {
+            for (DnsRecord record: additionals) {
+                query.addRecord(DnsSection.ADDITIONAL, record);
+            }
         }
+
         if (optResource != null) {
             query.addRecord(DnsSection.ADDITIONAL, optResource);
         }

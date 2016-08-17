@@ -46,8 +46,9 @@ public enum InternetProtocolFamily {
     }
 
     /**
-     * Returns the <a href="http://www.iana.org/assignments/address-family-numbers/address-family-numbers.xhtml">
-     *     address number</a> of the family.
+     * Returns the
+     * <a href="http://www.iana.org/assignments/address-family-numbers/address-family-numbers.xhtml">address number</a>
+     * of the family.
      */
     public int addressNumber() {
         return addressNumber;

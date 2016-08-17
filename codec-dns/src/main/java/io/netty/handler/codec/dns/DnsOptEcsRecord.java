@@ -26,12 +26,12 @@ import java.net.InetAddress;
 public interface DnsOptEcsRecord extends DnsOptPseudoRecord {
 
     /**
-     * Representing the leftmost number of significant bits of ADDRESS to be used for the lookup.
+     * Returns the leftmost number of significant bits of ADDRESS to be used for the lookup.
      */
     int sourcePrefixLength();
 
     /**
-     * Representing the leftmost number of significant bits of ADDRESS that the response covers.
+     * Returns the leftmost number of significant bits of ADDRESS that the response covers.
      * In queries, it MUST be 0.
      */
     int scopePrefixLength();

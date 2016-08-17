@@ -33,7 +33,7 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
  * Default implementation of {@link DnsCache}, backed by a {@link ConcurrentMap}.
- * If any additional {@link DnsRecord} is used no caching takes place.
+ * If any additional {@link DnsRecord} is used, no caching takes place.
  */
 @UnstableApi
 public class DefaultDnsCache implements DnsCache {
@@ -117,10 +117,14 @@ public class DefaultDnsCache implements DnsCache {
         return removed;
     }
 
+    private static boolean emptyAdditionals(DnsRecord[] additionals) {
+        return additionals == null || additionals.length == 0;
+    }
+
     @Override
-    public List<DnsCacheEntry> get(String hostname, Iterable<DnsRecord> additional) {
+    public List<DnsCacheEntry> get(String hostname, DnsRecord[] additionals) {
         checkNotNull(hostname, "hostname");
-        if (additional.iterator().hasNext()) {
+        if (!emptyAdditionals(additionals)) {
             return null;
         }
         return resolveCache.get(hostname);
@@ -140,13 +144,12 @@ public class DefaultDnsCache implements DnsCache {
     }
 
     @Override
-    public void cache(String hostname, Iterable<DnsRecord> additional,
+    public void cache(String hostname, DnsRecord[] additionals,
                       InetAddress address, long originalTtl, EventLoop loop) {
         checkNotNull(hostname, "hostname");
-        checkNotNull(additional, "additional");
         checkNotNull(address, "address");
         checkNotNull(loop, "loop");
-        if (maxTtl == 0 || additional.iterator().hasNext()) {
+        if (maxTtl == 0 || !emptyAdditionals(additionals)) {
             return;
         }
         final int ttl = Math.max(minTtl, (int) Math.min(maxTtl, originalTtl));
@@ -169,13 +172,12 @@ public class DefaultDnsCache implements DnsCache {
     }
 
     @Override
-    public void cache(String hostname, Iterable<DnsRecord> additional, Throwable cause, EventLoop loop) {
+    public void cache(String hostname, DnsRecord[] additionals, Throwable cause, EventLoop loop) {
         checkNotNull(hostname, "hostname");
-        checkNotNull(additional, "additional");
         checkNotNull(cause, "cause");
         checkNotNull(loop, "loop");
 
-        if (negativeTtl == 0 || additional.iterator().hasNext()) {
+        if (negativeTtl == 0 || !emptyAdditionals(additionals)) {
             return;
         }
         final List<DnsCacheEntry> entries = cachedEntries(hostname);
