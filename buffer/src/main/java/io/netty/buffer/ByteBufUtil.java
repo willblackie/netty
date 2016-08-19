@@ -229,52 +229,109 @@ public final class ByteBufUtil {
         final int minLength = Math.min(aLen, bLen);
         final int uintCount = minLength >>> 2;
         final int byteCount = minLength & 3;
-
         int aIndex = bufferA.readerIndex();
         int bIndex = bufferB.readerIndex();
 
-        if (bufferA.order() == bufferB.order()) {
-            for (int i = uintCount; i > 0; i --) {
-                long va = bufferA.getUnsignedInt(aIndex);
-                long vb = bufferB.getUnsignedInt(bIndex);
-                if (va > vb) {
-                    return 1;
-                }
-                if (va < vb) {
-                    return -1;
-                }
-                aIndex += 4;
-                bIndex += 4;
+        if (uintCount > 0) {
+            boolean bufferAIsBigEndian  = bufferA.order() == ByteOrder.BIG_ENDIAN;
+            final int res;
+            if (bufferA.order() == bufferB.order()) {
+                res = bufferAIsBigEndian ? compareUintBigEndian(bufferA, bufferB, aIndex, bIndex, uintCount) :
+                        compareUintLittleEndian(bufferA, bufferB, aIndex, bIndex, uintCount);
+            } else {
+                res = bufferAIsBigEndian ? compareUintBigEndianA(bufferA, bufferB, aIndex, bIndex, uintCount) :
+                        compareUintBigEndianB(bufferA, bufferB, aIndex, bIndex, uintCount);
             }
-        } else {
-            for (int i = uintCount; i > 0; i --) {
-                long va = bufferA.getUnsignedInt(aIndex);
-                long vb = swapInt(bufferB.getInt(bIndex)) & 0xFFFFFFFFL;
-                if (va > vb) {
-                    return 1;
-                }
-                if (va < vb) {
-                    return -1;
-                }
-                aIndex += 4;
-                bIndex += 4;
+            if (res != 0) {
+                return res;
             }
+            int uintCountIncrement = uintCount << 2;
+            aIndex += uintCountIncrement;
+            bIndex += uintCountIncrement;
         }
 
-        for (int i = byteCount; i > 0; i --) {
+        for (int i = byteCount; i > 0; --i, ++aIndex, ++bIndex) {
             short va = bufferA.getUnsignedByte(aIndex);
             short vb = bufferB.getUnsignedByte(bIndex);
+            if (va == vb) {
+                // fast-path
+                continue;
+            }
             if (va > vb) {
                 return 1;
             }
-            if (va < vb) {
-                return -1;
-            }
-            aIndex ++;
-            bIndex ++;
+            return -1;
         }
 
         return aLen - bLen;
+    }
+
+    private static int compareUintBigEndian(
+            ByteBuf bufferA, ByteBuf bufferB, int aIndex, int bIndex, int uintCount) {
+        for (int i = uintCount; i > 0; --i, aIndex += 4, bIndex += 4) {
+            long va = bufferA.getUnsignedInt(aIndex);
+            long vb = bufferB.getUnsignedInt(bIndex);
+            if (va == vb) {
+                // fast-path
+                continue;
+            }
+            if (va > vb) {
+                return 1;
+            }
+            return -1;
+        }
+        return 0;
+    }
+
+    private static int compareUintLittleEndian(
+            ByteBuf bufferA, ByteBuf bufferB, int aIndex, int bIndex, int uintCount) {
+        for (int i = uintCount; i > 0; --i, aIndex += 4, bIndex += 4) {
+            long va = bufferA.getUnsignedIntLE(aIndex);
+            long vb = bufferB.getUnsignedIntLE(bIndex);
+            if (va == vb) {
+                // fast-path
+                continue;
+            }
+            if (va > vb) {
+                return 1;
+            }
+            return -1;
+        }
+        return 0;
+    }
+
+    private static int compareUintBigEndianA(
+            ByteBuf bufferA, ByteBuf bufferB, int aIndex, int bIndex, int uintCount) {
+        for (int i = uintCount; i > 0; --i, aIndex += 4, bIndex += 4) {
+            long va = bufferA.getUnsignedInt(aIndex);
+            long vb = bufferB.getUnsignedIntLE(bIndex);
+            if (va == vb) {
+                // fast-path
+                continue;
+            }
+            if (va > vb) {
+                return 1;
+            }
+            return -1;
+        }
+        return 0;
+    }
+
+    private static int compareUintBigEndianB(
+            ByteBuf bufferA, ByteBuf bufferB, int aIndex, int bIndex, int uintCount) {
+        for (int i = uintCount; i > 0; --i, aIndex += 4, bIndex += 4) {
+            long va = bufferA.getUnsignedIntLE(aIndex);
+            long vb = bufferB.getUnsignedInt(bIndex);
+            if (va == vb) {
+                // fast-path
+                continue;
+            }
+            if (va > vb) {
+                return 1;
+            }
+            return -1;
+        }
+        return 0;
     }
 
     /**
